@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Odysseus AI Workspace",
+  "description": "A self-hosted, privacy-first interface for talking to language models with tools, agents, and local persistence.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
