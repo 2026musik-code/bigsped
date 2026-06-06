@@ -13,7 +13,15 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 
 let aiClient: GoogleGenAI | null = null;
-function getAiClient() {
+function getAiClient(req: express.Request) {
+  const customKey = req.headers["x-gemini-api-key"] as string;
+  if (customKey) {
+    return new GoogleGenAI({ 
+      apiKey: customKey,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
+  }
+
   if (!aiClient) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
@@ -31,7 +39,7 @@ function getAiClient() {
 app.post("/api/chat", async (req, res) => {
   try {
     const { messages } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient(req);
     
     let resultText = "";
     if (messages && messages.length > 0) {
@@ -57,10 +65,10 @@ app.post("/api/chat", async (req, res) => {
 
     res.json({ text: resultText });
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    if (error.message === "API_KEY_MISSING") {
-      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings." });
+    if (error?.message === "API_KEY_MISSING") {
+      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings. Silakan tambahkan API key Anda." });
     }
+    console.error("Gemini API Error:", error);
     res.status(500).json({ error: "Maaf, sistem EduAI Premier mengalami kendala teknis." });
   }
 });
@@ -71,7 +79,7 @@ app.post("/api/generate-image", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt gambar diperlukan." });
 
-    const ai = getAiClient();
+    const ai = getAiClient(req);
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -103,10 +111,10 @@ app.post("/api/generate-image", async (req, res) => {
     res.json({ imageUrl });
 
   } catch (error: any) {
-    console.error("Image Gen Error:", error);
-    if (error.message === "API_KEY_MISSING") {
-      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings." });
+    if (error?.message === "API_KEY_MISSING") {
+      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings. Silakan tambahkan API key Anda." });
     }
+    console.error("Image Gen Error:", error);
     res.status(500).json({ error: `Gagal membuat gambar: ${error.message || "Unknown error"}` });
   }
 });
@@ -117,7 +125,7 @@ app.post("/api/generate-voice", async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: "Teks untuk suara diperlukan." });
 
-    const ai = getAiClient();
+    const ai = getAiClient(req);
     
     // We import dynamically or just use string "AUDIO"
     return await new Promise(async (resolve) => {
@@ -151,10 +159,10 @@ app.post("/api/generate-voice", async (req, res) => {
     });
     
   } catch (error: any) {
-    console.error("Voice Gen Error:", error);
-    if (error.message === "API_KEY_MISSING") {
-      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings." });
+    if (error?.message === "API_KEY_MISSING") {
+      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings. Silakan tambahkan API key Anda." });
     }
+    console.error("Voice Gen Error:", error);
     res.status(500).json({ error: "Gagal membuat suara: " + error.message });
   }
 });

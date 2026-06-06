@@ -8,11 +8,14 @@ import {
   Sparkles,
   Download,
   PlaySquare,
-  BookOpen
+  BookOpen,
+  Menu,
+  Settings,
+  X
 } from "lucide-react";
 import Markdown from "react-markdown";
 
-type Tab = "tutor" | "image" | "voice";
+type Tab = "tutor" | "image" | "voice" | "settings";
 
 interface Message {
   role: "user" | "assistant";
@@ -21,6 +24,18 @@ interface Message {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("tutor");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [apiKey, setApiKey] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("eduai_api_key") || "";
+    }
+    return "";
+  });
+  
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem("eduai_api_key", key);
+  };
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -60,7 +75,10 @@ export default function App() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(apiKey ? { "x-gemini-api-key": apiKey } : {})
+        },
         body: JSON.stringify({ messages: [...messages, newMsg] })
       });
       const data = await res.json();
@@ -86,7 +104,10 @@ export default function App() {
     try {
       const res = await fetch("/api/generate-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(apiKey ? { "x-gemini-api-key": apiKey } : {})
+        },
         body: JSON.stringify({ prompt: imagePrompt.trim() })
       });
       const data = await res.json();
@@ -112,7 +133,10 @@ export default function App() {
     try {
       const res = await fetch("/api/generate-voice", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(apiKey ? { "x-gemini-api-key": apiKey } : {})
+        },
         body: JSON.stringify({ text: voiceText.trim() })
       });
       const data = await res.json();
@@ -129,9 +153,25 @@ export default function App() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-[#0d1117] text-[#c9d1d9] font-sans selection:bg-[#388bfd] selection:text-white">
-      {/* Sidebar / Top Header */}
-      <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-[#30363d] bg-[#161b22] flex flex-col shrink-0 shadow-md md:shadow-none z-10">
-        <div className="p-4 md:p-6 border-b border-[#30363d] flex items-center space-x-3">
+      {/* Mobile Top Header (Garisan Tiga) */}
+      <div className="md:hidden flex items-center justify-between p-4 border-b border-[#30363d] bg-[#161b22] shadow-md z-20 relative">
+        <div className="flex items-center space-x-2">
+          <GraduationCap size={20} className="text-amber-500" />
+          <h1 className="font-serif text-lg font-semibold text-[#e6edf3]">EduAI Premier</h1>
+        </div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-gray-400 hover:text-white bg-[#0d1117] rounded-lg">
+          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
+      {/* Sidebar Overlay Mobile */}
+      {isSidebarOpen && (
+         <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
+      )}
+
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 w-72 border-r border-[#30363d] bg-[#161b22] flex flex-col shrink-0 shadow-2xl md:shadow-none z-30 transition-transform duration-300 ease-in-out`}>
+        <div className="hidden md:flex p-6 border-b border-[#30363d] items-center space-x-3">
           <div className="bg-gradient-to-br from-amber-200 to-amber-500 p-2 rounded-xl text-black shrink-0">
             <GraduationCap size={24} strokeWidth={2.5} />
           </div>
@@ -141,12 +181,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex p-4 flex-col space-y-2 flex-1 overflow-y-auto">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4 px-2">Layanan AI</div>
+        {/* Navigation */}
+        <div className="flex flex-col p-4 space-y-2 flex-1 overflow-y-auto">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4 px-2 mt-4 md:mt-0">Layanan AI</div>
           
           <button 
-            onClick={() => setActiveTab("tutor")}
+            onClick={() => { setActiveTab("tutor"); setIsSidebarOpen(false); }}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
               activeTab === "tutor" ? "bg-[#1f242c] text-[#e6edf3] shadow-sm border border-[#30363d]" : "text-gray-400 hover:text-gray-200 hover:bg-[#1f242c]"
             }`}
@@ -156,7 +196,7 @@ export default function App() {
           </button>
           
           <button 
-            onClick={() => setActiveTab("image")}
+            onClick={() => { setActiveTab("image"); setIsSidebarOpen(false); }}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
               activeTab === "image" ? "bg-[#1f242c] text-[#e6edf3] shadow-sm border border-[#30363d]" : "text-gray-400 hover:text-gray-200 hover:bg-[#1f242c]"
             }`}
@@ -166,7 +206,7 @@ export default function App() {
           </button>
 
           <button 
-            onClick={() => setActiveTab("voice")}
+            onClick={() => { setActiveTab("voice"); setIsSidebarOpen(false); }}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
               activeTab === "voice" ? "bg-[#1f242c] text-[#e6edf3] shadow-sm border border-[#30363d]" : "text-gray-400 hover:text-gray-200 hover:bg-[#1f242c]"
             }`}
@@ -174,37 +214,27 @@ export default function App() {
             <Mic2 size={18} />
             <span className="font-medium text-sm">Suara AI</span>
           </button>
+
+          <div className="my-4 border-t border-[#30363d]"></div>
+          
+          <button 
+            onClick={() => { setActiveTab("settings"); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+              activeTab === "settings" ? "bg-[#1f242c] text-[#e6edf3] shadow-sm border border-[#30363d]" : "text-gray-400 hover:text-gray-200 hover:bg-[#1f242c]"
+            }`}
+          >
+            <Settings size={18} />
+            <span className="font-medium text-sm">Pengaturan</span>
+          </button>
         </div>
 
-        <div className="hidden md:block p-4 border-t border-[#30363d] text-xs text-center text-gray-500">
+        <div className="p-4 border-t border-[#30363d] text-xs text-center text-gray-500">
           EduAI Premier © {new Date().getFullYear()}
-        </div>
-
-        {/* Mobile Navigation */}
-        <div className="md:hidden flex p-2 space-x-2 bg-[#0d1117] overflow-x-auto">
-          <button 
-            onClick={() => setActiveTab("tutor")}
-            className={`flex-1 whitespace-nowrap flex justify-center items-center space-x-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "tutor" ? "bg-[#1f242c] text-[#e6edf3] border border-[#30363d] shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
-          >
-            <BookOpen size={16} /> <span>Tutor</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("image")}
-            className={`flex-1 whitespace-nowrap flex justify-center items-center space-x-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "image" ? "bg-[#1f242c] text-[#e6edf3] border border-[#30363d] shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
-          >
-            <Palette size={16} /> <span>Seni</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("voice")}
-            className={`flex-1 whitespace-nowrap flex justify-center items-center space-x-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === "voice" ? "bg-[#1f242c] text-[#e6edf3] border border-[#30363d] shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
-          >
-            <Mic2 size={16} /> <span>Suara</span>
-          </button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#161b22] via-[#0d1117] to-[#0d1117]">
+      <div className="flex-1 flex flex-col relative w-full h-[calc(100vh-65px)] md:h-full overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#161b22] via-[#0d1117] to-[#0d1117]">
         
         {/* Error Banner */}
         {errorMsg && (
@@ -405,6 +435,43 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content: Pengaturan */}
+        {activeTab === "settings" && (
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-3xl mx-auto">
+              <div className="mb-8 border-b border-[#30363d] pb-6">
+                <h2 className="text-3xl font-serif text-[#e6edf3] mb-2 flex items-center">
+                  <Settings size={24} className="text-amber-500 mr-3" />
+                  Pengaturan Keamanan
+                </h2>
+                <p className="text-gray-400 text-sm">Kelola kunci akses API Gemini untuk pengalaman asisten pribadi yang eksklusif.</p>
+              </div>
+
+              <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-6 shadow-xl mb-8">
+                <h3 className="font-serif text-lg text-[#e6edf3] mb-4">Integrasi Kunci API (R2 / Local Storage)</h3>
+                <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                  Masukkan Gemini API Key pribadi Anda untuk mengaktifkan fitur AI. Key Anda akan disimpan secara lokal di keamanan peramban ini (Local Storage) dan digunakan pada setiap permintaan.
+                </p>
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-gray-300">Gemini API Key</label>
+                  <input
+                    type="password"
+                    className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl p-4 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-[#e6edf3] placeholder:text-gray-600 shadow-inner"
+                    placeholder="AIzaSy..."
+                    value={apiKey}
+                    onChange={(e) => handleSaveApiKey(e.target.value)}
+                  />
+                  {apiKey && (
+                    <div className="mt-2 text-xs text-green-400 flex items-center">
+                      <Sparkles size={14} className="mr-1.5" /> API Key berhasil disimpan untuk sesi operasional ini.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
