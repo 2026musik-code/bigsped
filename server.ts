@@ -9,7 +9,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+// Increase payload limit for images
+app.use(express.json({ limit: "50mb" }));
 
 let aiClient: GoogleGenAI | null = null;
 function getAiClient() {
@@ -26,21 +27,10 @@ function getAiClient() {
   return aiClient;
 }
 
+// 1. Text & Chat Feature
 app.post("/api/chat", async (req, res) => {
   try {
     const { messages } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    // Jika tidak ada API key, simulasikan respons dari model lokal gratis (Ollama/llama.cpp)
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey === "YOUR_API_KEY") {
-      const lastMessage = messages?.[messages.length - 1]?.content || "";
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulasi jeda komputasi lokal
-      
-      const simulateLocalText = `**[Simulasi Mode Lokal]**\n\nSaya telah menerima pesan Anda: *"${lastMessage}"*\n\nSeperti proyek [Odysseus di GitHub](https://github.com/pewdiepie-archdaemon/odysseus), sistem ini dapat dikonfigurasi untuk berjalan **100% secara lokal dan gratis** menggunakan model seperti **Ollama**, **vLLM**, atau **llama.cpp**. Tidak ada data yang dikirim ke internet, dan tidak diperlukan API Key berbayar.\n\nDalam versi pratinjau antarmuka web ini, saya menggunakan server simulasi lokal untuk membalas pesan Anda.`;
-      
-      return res.json({ text: simulateLocalText });
-    }
-
     const ai = getAiClient();
     
     let resultText = "";
@@ -53,13 +43,13 @@ app.post("/api/chat", async (req, res) => {
       const lastMessage = messages[messages.length - 1].content;
       
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.5-flash",
         contents: [
           ...history,
           { role: "user", parts: [{ text: lastMessage }] }
         ],
         config: {
-          systemInstruction: "You are Odysseus, a smart, versatile AI assistant. Answer intelligently using markdown formatting where useful.",
+          systemInstruction: "Anda adalah EduAI Premier, asisten intelektual sekolah yang mewah dan cerdas. Gunakan bahasa Indonesia yang sopan, elegan, dan sangat membantu.",
         }
       });
       resultText = response.text || "";
@@ -68,17 +58,104 @@ app.post("/api/chat", async (req, res) => {
     res.json({ text: resultText });
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    
     if (error.message === "API_KEY_MISSING") {
-      return res.status(400).json({ error: "API Key belum dikonfigurasi. Silakan tambahkan Gemini API Key Anda di menu Settings (ikon gembok)." });
+      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings." });
     }
+    res.status(500).json({ error: "Maaf, sistem EduAI Premier mengalami kendala teknis." });
+  }
+});
+
+// 2. Image Generation Feature
+app.post("/api/generate-image", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "Prompt gambar diperlukan." });
+
+    const ai = getAiClient();
     
-    // Check if it's an invalid API key error
-    if (error.status === "INVALID_ARGUMENT" || error.message?.includes("API key not valid")) {
-       return res.status(400).json({ error: "Gemini API Key tidak valid. Silakan periksa kembali konfigurasi API Key di menu Settings." });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: prompt }]
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1",
+          imageSize: "1K"
+        }
+      }
+    });
+
+    let imageUrl = "";
+    if (response.candidates && response.candidates[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
     }
 
-    res.status(500).json({ error: "Maaf, saya mengalami kendala teknis saat memproses pesan Anda." });
+    if (!imageUrl) {
+        throw new Error("Tidak ada gambar yang dihasilkan.");
+    }
+
+    res.json({ imageUrl });
+
+  } catch (error: any) {
+    console.error("Image Gen Error:", error);
+    if (error.message === "API_KEY_MISSING") {
+      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings." });
+    }
+    res.status(500).json({ error: `Gagal membuat gambar: ${error.message || "Unknown error"}` });
+  }
+});
+
+// 3. Audio (TTS) Generation Feature
+app.post("/api/generate-voice", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: "Teks untuk suara diperlukan." });
+
+    const ai = getAiClient();
+    
+    // We import dynamically or just use string "AUDIO"
+    return await new Promise(async (resolve) => {
+        try {
+            const response = await ai.models.generateContent({
+                model: "gemini-3.1-flash-tts-preview",
+                contents: [{ parts: [{ text: text }] }],
+                config: {
+                    responseModalities: ["AUDIO" as any], 
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: 'Kore' },
+                        },
+                    },
+                },
+            });
+            
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+                const audioUrl = `data:audio/pcm;rate=24000;base64,${base64Audio}`;
+                res.json({ audioUrl });
+                resolve(null);
+            } else {
+                throw new Error("Tidak ada audio yang dihasilkan.");
+            }
+        } catch(e:any) {
+             console.error(e);
+             res.status(500).json({ error: `Gagal membuat suara: ${e.message || "Unknown error"}` });
+             resolve(null);
+        }
+    });
+    
+  } catch (error: any) {
+    console.error("Voice Gen Error:", error);
+    if (error.message === "API_KEY_MISSING") {
+      return res.status(400).json({ error: "Gemini API Key belum dikonfigurasi di Settings." });
+    }
+    res.status(500).json({ error: "Gagal membuat suara: " + error.message });
   }
 });
 
