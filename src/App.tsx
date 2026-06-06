@@ -31,10 +31,14 @@ export default function App() {
     }
     return "";
   });
+  const [apiKeyInput, setApiKeyInput] = useState(apiKey);
+  const [isKeySaved, setIsKeySaved] = useState(false);
   
-  const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem("eduai_api_key", key);
+  const handleSaveApiKey = () => {
+    setApiKey(apiKeyInput);
+    localStorage.setItem("eduai_api_key", apiKeyInput);
+    setIsKeySaved(true);
+    setTimeout(() => setIsKeySaved(false), 3000);
   };
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -81,7 +85,13 @@ export default function App() {
         },
         body: JSON.stringify({ messages: [...messages, newMsg] })
       });
-      const data = await res.json();
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(`Server tidak memberikan respons yang valid (Status: ${res.status}).`);
+      }
 
       if (!res.ok) throw new Error(data.error || "Gagal mendapatkan respons dari server.");
 
@@ -110,7 +120,13 @@ export default function App() {
         },
         body: JSON.stringify({ prompt: imagePrompt.trim() })
       });
-      const data = await res.json();
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(`Server tidak memberikan respons yang valid (Status: ${res.status}).`);
+      }
 
       if (!res.ok) throw new Error(data.error || "Gagal membuat gambar.");
 
@@ -139,7 +155,13 @@ export default function App() {
         },
         body: JSON.stringify({ text: voiceText.trim() })
       });
-      const data = await res.json();
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error(`Server tidak memberikan respons yang valid (Status: ${res.status}).`);
+      }
 
       if (!res.ok) throw new Error(data.error || "Gagal membuat suara.");
 
@@ -458,14 +480,22 @@ export default function App() {
                 </p>
                 <div className="space-y-4">
                   <label className="block text-sm font-medium text-gray-300">Gemini API Key</label>
-                  <input
-                    type="password"
-                    className="w-full bg-[#0d1117] border border-[#30363d] rounded-xl p-4 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-[#e6edf3] placeholder:text-gray-600 shadow-inner"
-                    placeholder="AIzaSy..."
-                    value={apiKey}
-                    onChange={(e) => handleSaveApiKey(e.target.value)}
-                  />
-                  {apiKey && (
+                  <div className="flex flex-col md:flex-row gap-3">
+                    <input
+                      type="password"
+                      className="flex-1 bg-[#0d1117] border border-[#30363d] rounded-xl p-3 md:p-4 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-[#e6edf3] placeholder:text-gray-600 shadow-inner"
+                      placeholder="AIzaSy..."
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                    />
+                    <button
+                      onClick={handleSaveApiKey}
+                      className="bg-amber-600 hover:bg-amber-500 text-white font-medium py-3 px-6 rounded-xl transition-all flex justify-center items-center h-full whitespace-nowrap"
+                    >
+                      Simpan Key
+                    </button>
+                  </div>
+                  {isKeySaved && (
                     <div className="mt-2 text-xs text-green-400 flex items-center">
                       <Sparkles size={14} className="mr-1.5" /> API Key berhasil disimpan untuk sesi operasional ini.
                     </div>
